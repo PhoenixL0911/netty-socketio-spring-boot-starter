@@ -1,2 +1,2 @@
 org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
-com.github.deersunny.socketio.spring.starter.NettySocketIOServerAutoConfiguration
+io.github.deersunny.socketio.spring.starter.NettySocketIOServerAutoConfiguration

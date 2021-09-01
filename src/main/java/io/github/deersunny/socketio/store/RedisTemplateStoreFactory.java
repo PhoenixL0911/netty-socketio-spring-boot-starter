@@ -202,7 +202,7 @@
  *    See the License for the specific language governing permissions and
  *    limitations under the License.
  */
-package com.github.deersunny.socketio.store;
+package io.github.deersunny.socketio.store;
 
 import com.corundumstudio.socketio.store.Store;
 import com.corundumstudio.socketio.store.pubsub.BaseStoreFactory;

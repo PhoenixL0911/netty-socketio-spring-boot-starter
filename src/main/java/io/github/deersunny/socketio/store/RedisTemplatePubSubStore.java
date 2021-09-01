@@ -202,76 +202,80 @@
  *    See the License for the specific language governing permissions and
  *    limitations under the License.
  */
-package com.github.deersunny.socketio.spring.starter;
+package io.github.deersunny.socketio.store;
 
-import com.corundumstudio.socketio.AuthorizationListener;
-import com.corundumstudio.socketio.SocketIOServer;
-import com.corundumstudio.socketio.annotation.SpringAnnotationScanner;
-import com.corundumstudio.socketio.listener.ExceptionListener;
-import com.corundumstudio.socketio.store.StoreFactory;
-import io.netty.channel.epoll.Epoll;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.util.CollectionUtils;
+import com.corundumstudio.socketio.store.pubsub.PubSubListener;
+import com.corundumstudio.socketio.store.pubsub.PubSubMessage;
+import com.corundumstudio.socketio.store.pubsub.PubSubStore;
+import com.corundumstudio.socketio.store.pubsub.PubSubType;
+import io.netty.util.internal.PlatformDependent;
+import org.springframework.data.redis.connection.MessageListener;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.listener.ChannelTopic;
+import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 
-import java.util.List;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.ConcurrentMap;
 
 /**
  * @author DeerSunny
  */
-@Configuration
-@ConditionalOnClass({SocketIOServer.class, SpringAnnotationScanner.class})
-@ConditionalOnProperty(prefix = NettySocketIOServerProperties.PREFIX, value = "enabled", havingValue = "true")
-@EnableConfigurationProperties({NettySocketIOServerProperties.class})
-public class NettySocketIOServerAutoConfiguration {
-    private static final Logger LOG = LoggerFactory.getLogger(NettySocketIOServerAutoConfiguration.class);
+@SuppressWarnings("unchecked")
+public class RedisTemplatePubSubStore implements PubSubStore {
 
-    @Autowired
-    private NettySocketIOServerProperties config;
+    private final RedisTemplate<String, Object> redisTemplate;
 
-    @Autowired(required = false)
-    private List<NettySocketIOAutoConfigurationCustomizer> nettySocketIOAutoConfigurationCustomizers;
+    private final RedisMessageListenerContainer redisMessageListenerContainer;
 
-    @Bean(destroyMethod = "stop")
-    public SocketIOServer socketIOServer(@Autowired(required = false) AuthorizationListener authorizationListener, @Autowired(required = false) ExceptionListener exceptionListener, @Autowired(required = false) StoreFactory storeFactory) {
+    private final Long nodeId;
 
-        if (authorizationListener != null) {
-            config.setAuthorizationListener(authorizationListener);
-        }
+    private final ConcurrentMap<String, Queue<MessageListener>> queues = PlatformDependent.newConcurrentHashMap();
 
-        if (exceptionListener != null) {
-            config.setExceptionListener(exceptionListener);
-        }
+    public RedisTemplatePubSubStore(RedisTemplate<String, Object> redisTemplate, RedisMessageListenerContainer redisMessageListenerContainer, Long nodeId) {
+        this.redisTemplate = redisTemplate;
+        this.redisMessageListenerContainer = redisMessageListenerContainer;
+        this.nodeId = nodeId;
+    }
 
-        if (storeFactory != null) {
-            config.setStoreFactory(storeFactory);
-        }
+    @Override
+    public void publish(PubSubType type, PubSubMessage msg) {
+        msg.setNodeId(nodeId);
+        redisTemplate.convertAndSend(type.toString(), msg);
+    }
 
-        // check Epoll availability.
-        if (config.isUseLinuxNativeEpoll() && !Epoll.isAvailable()) {
-            LOG.warn("Epoll library not available, disabling native epoll");
-            config.setUseLinuxNativeEpoll(false);
-        }
-
-        // If custom configuration is not empty.
-        if (!CollectionUtils.isEmpty(nettySocketIOAutoConfigurationCustomizers)) {
-            for (NettySocketIOAutoConfigurationCustomizer customizer : nettySocketIOAutoConfigurationCustomizers) {
-                customizer.customize(config);
+    @Override
+    public <T extends PubSubMessage> void subscribe(PubSubType type, PubSubListener<T> listener, Class<T> clazz) {
+        String name = type.toString();
+        MessageListener messageListener = (message, bytes) -> {
+            PubSubMessage msg = (PubSubMessage) redisTemplate.getValueSerializer().deserialize(message.getBody());
+            if (msg != null && nodeId.equals(msg.getNodeId())) {
+                listener.onMessage((T) msg);
+            }
+        };
+        redisMessageListenerContainer.addMessageListener(messageListener, new ChannelTopic(name));
+        Queue<MessageListener> queue = queues.get(name);
+        if (queue == null) {
+            queue = new ConcurrentLinkedDeque<>();
+            Queue<MessageListener> oldQueue = queues.putIfAbsent(name, queue);
+            if (oldQueue != null) {
+                queue = oldQueue;
             }
         }
-
-        return new SocketIOServer(config);
+        queue.add(messageListener);
     }
 
-    @Bean
-    public SpringAnnotationScanner springAnnotationScanner(SocketIOServer socketIOServer) {
-        return new SpringAnnotationScanner(socketIOServer);
+    @Override
+    public void unsubscribe(PubSubType type) {
+        String name = type.toString();
+        Queue<MessageListener> queue = queues.remove(name);
+        for (MessageListener listener : queue) {
+            redisMessageListenerContainer.removeMessageListener(listener);
+        }
     }
 
+    @Override
+    public void shutdown() {
+
+    }
 }

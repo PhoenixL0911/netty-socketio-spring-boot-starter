@@ -202,48 +202,43 @@
  *    See the License for the specific language governing permissions and
  *    limitations under the License.
  */
-package com.github.deersunny.socketio.store;
+package io.github.deersunny.socketio.spring.starter;
 
-import com.corundumstudio.socketio.store.Store;
-import org.springframework.data.redis.core.BoundHashOperations;
-import org.springframework.data.redis.core.RedisTemplate;
+import com.corundumstudio.socketio.Configuration;
+import com.corundumstudio.socketio.SocketConfig;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 
-import java.util.Map;
-import java.util.UUID;
 
 /**
+ *
  * @author DeerSunny
  */
-@SuppressWarnings("unchecked")
-public class RedisTemplateStore implements Store {
+@ConfigurationProperties(NettySocketIOServerProperties.PREFIX)
+public class NettySocketIOServerProperties extends Configuration {
+    public static final String PREFIX = "spring.netty.socketio.server";
 
-    private final BoundHashOperations<String, String, Object> boundHashOperations;
+    /**
+     * Is enable NettySocketIO server
+     * TODO: Default Not Enabled
+     */
+    private boolean isEnabled = false;
 
-    public RedisTemplateStore(UUID sessionId, RedisTemplate<String, Object> redisTemplate) {
-        boundHashOperations = redisTemplate.boundHashOps(sessionId.toString());
+    public boolean isEnabled() {
+        return isEnabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+        isEnabled = enabled;
     }
 
     @Override
-    public void set(String key, Object val) {
-        boundHashOperations.put(key, val);
+    public SocketConfig getSocketConfig() {
+        return super.getSocketConfig();
     }
 
     @Override
-    public <T> T get(String key) {
-        Map<String, Object> entries = boundHashOperations.entries();
-        if (entries != null) {
-            return (T) entries.get(key);
-        }
-        return null;
+    public void setSocketConfig(SocketConfig socketConfig) {
+        super.setSocketConfig(socketConfig);
     }
 
-    @Override
-    public boolean has(String key) {
-        return Boolean.TRUE.equals(boundHashOperations.hasKey(key));
-    }
-
-    @Override
-    public void del(String key) {
-        boundHashOperations.delete(key);
-    }
 }
