@@ -59,7 +59,7 @@
         <maven-source-plugin.version>3.2.1</maven-source-plugin.version>
         <maven-javadoc-plugin.version>3.3.0</maven-javadoc-plugin.version>
         <maven-gpg-plugin.version>3.0.1</maven-gpg-plugin.version>
-        <maven-release-plugin.version>3.0.0-M4</maven-release-plugin.version>
+        <maven-release-plugin.version>2.5.3</maven-release-plugin.version>
         <maven-deploy-plugin.version>3.0.0-M1</maven-deploy-plugin.version>
         <nexus-staging-maven-plugin.version>1.6.8</nexus-staging-maven-plugin.version>
         <license-maven-plugin.version>4.1</license-maven-plugin.version>
@@ -255,6 +255,7 @@
             </properties>
         </profile>
 
+        <!-- 以下配置用于发布到 maven 中央仓库使用，如不需要，无须勾选 -->
         <profile>
             <id>release</id>
             <build>
