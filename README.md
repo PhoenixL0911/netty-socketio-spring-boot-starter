@@ -10,6 +10,14 @@
 ### 使用
 
 #### 1、添加依赖
+```xml
+<!-- https://mvnrepository.com/artifact/io.github.deersunny/netty-socketio-spring-boot-starter -->
+<dependency>
+    <groupId>io.github.deersunny</groupId>
+    <artifactId>netty-socketio-spring-boot-starter</artifactId>
+    <version>1.0.0</version>
+</dependency>
+```
 
 #### 2、在 SpringBoot 的配置文件中加入以下配置（参考自：[socketio-spring-boot-starter](https://github.com/hiwepy/socketio-spring-boot-starter/blob/master/README.md) ）
 
